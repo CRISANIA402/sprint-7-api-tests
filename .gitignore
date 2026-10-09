@@ -1,0 +1,22 @@
+# Виртуальное окружение — не нужно в репозитории
+venv/
+
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+
+.pytest_cache/
+
+
+.vscode/
+*.swp
+*.swo
+*~
+
+
+.DS_Store
+Thumbs.db
+
+allure-results/
