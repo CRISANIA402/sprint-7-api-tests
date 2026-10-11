@@ -21,4 +21,3 @@ def new_courier():
         "password": password,
         "first_name": first_name,
     }
-

@@ -23,4 +23,3 @@ def register_new_courier_and_return_login_password():
     if response.status_code == 201:
         return [login, password, first_name]
     return []
-

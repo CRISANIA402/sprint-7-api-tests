@@ -30,3 +30,4 @@ class TestGetOrders:
         assert response.status_code == 200
         data = response.json()
         assert isinstance(data, list) or (isinstance(data, dict) and "orders" in data)
+
