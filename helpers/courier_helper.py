@@ -24,3 +24,4 @@ def register_new_courier_and_return_login_password():
         return [login, password, first_name]
     return []
 
+

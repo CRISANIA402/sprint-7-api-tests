@@ -129,3 +129,4 @@ class TestCourierLogin:
         
         response = requests.post(f"{BASE_URL}/courier/login", data=payload)
         assert response.status_code != 200
+
