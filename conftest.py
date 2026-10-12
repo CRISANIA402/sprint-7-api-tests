@@ -1,7 +1,7 @@
 import pytest
 import random
 import string
-from config import BASE_URL
+from helpers.courier_helper import create_courier 
 
 def generate_unique_login():
     prefix = "uniq_"
@@ -9,15 +9,32 @@ def generate_unique_login():
     return prefix + random_part
 
 @pytest.fixture
-def new_courier():
-    """Возвращает только данные для курьера: логин, пароль, first_name.
-     Не делает запросы к API — это задача тестов."""
+def registered_courier():
     login = generate_unique_login()
     password = ''.join(random.choices(string.ascii_lowercase + string.digits, k=10))
     first_name = ''.join(random.choices(string.ascii_lowercase, k=8))
 
-    return {
+    payload = {
         "login": login,
         "password": password,
-        "first_name": first_name,
+        "firstName": first_name,
     }
+
+    response = create_courier(payload)
+    
+    if response.status_code == 409:
+        pytest.fail(f"Логин {login} уже занят в базе. Это редкий случай на общем стенде.")
+
+    assert response.status_code == 201, f"Не удалось создать курьера: {response.status_code}, {response.text}"
+
+    data = response.json()
+    assert "id" in data, "В ответе нет поля id"
+    assert data["login"] == login, "Логин в ответе не совпадает с отправленным"
+    assert data.get("firstName") == first_name, "firstName в ответе не совпадает"
+
+    yield {
+        "payload": payload,
+        "response": response,
+        "data": data,
+    }
+
