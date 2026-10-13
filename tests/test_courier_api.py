@@ -2,7 +2,6 @@ import pytest
 import allure
 from helpers.courier_helper import create_courier, login_courier  
 
-
 class TestCreateCourier:
     @allure.title("Успешная регистрация курьера (ожидается 201 Created)")
     def test_create_courier_success(self, registered_courier):

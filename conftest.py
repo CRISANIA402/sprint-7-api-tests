@@ -22,6 +22,9 @@ def registered_courier():
 
     response = create_courier(payload)
     
+    if response.status_code >= 400:
+        pytest.fail(f"Не удалось создать курьера. Статус: {response.status_code}, ответ: {response.text}")
+
     if response.status_code == 409:
         pytest.fail(f"Логин {login} уже занят в базе. Это редкий случай на общем стенде.")
 
@@ -37,4 +40,3 @@ def registered_courier():
         "response": response,
         "data": data,
     }
-

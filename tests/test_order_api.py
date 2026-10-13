@@ -2,7 +2,6 @@ import pytest
 import allure
 from helpers.order_helper import create_order, get_orders
 
-
 class TestCreateOrder:
     @allure.title("Создание заказа с разными вариантами цветов (ожидается track в ответе)")
     @pytest.mark.parametrize("color_list", [
