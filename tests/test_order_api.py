@@ -36,3 +36,4 @@ class TestGetOrders:
             isinstance(data, list)
             or (isinstance(data, dict) and "orders" in data)
         ), "Ответ не соответствует ожидаемой структуре (список либо dict с ключом orders)"
+

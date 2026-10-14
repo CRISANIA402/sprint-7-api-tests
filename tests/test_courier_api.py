@@ -1,6 +1,6 @@
 import pytest
 import allure
-from helpers.courier_helper import create_courier, login_courier  
+from helpers.courier_helper import create_courier, login_courier, delete_courier
 
 class TestCreateCourier:
     @allure.title("Успешная регистрация курьера (ожидается 201 Created)")
@@ -81,3 +81,55 @@ class TestCourierLogin:
         assert response.status_code != 200, f"Ожидалась ошибка из‑за отсутствия {missing_field}, но получен статус {response.status_code}"
         data = response.json()
         assert not data.get("ok", True), "При отсутствии обязательного поля поле 'ok' должно быть False"
+
+class TestDeleteCourier:
+    @allure.title("Успешное удаление курьера (ожидается ok: true)")
+    def test_delete_courier_success(self, registered_courier):
+        """Курьер удаляется, API возвращает {'ok': True}."""
+        courier_id = registered_courier["data"]["id"]
+        response = delete_courier(courier_id)
+
+        assert response.status_code == 200, f"Ожидался статус 200, получен: {response.status_code}"
+        data = response.json()
+        assert data.get("ok") is True, f"Поле 'ok' должно быть True, получено: {data}"
+
+    @allure.title("Ошибка при удалении курьера без ID (некорректный URL)")
+    def test_delete_courier_without_id(self):
+        """Если не передать ID, сервер должен вернуть ошибку (404 или 400)."""
+        response = requests.delete(f"{BASE_URL}/courier/")
+
+        assert response.status_code in (400, 404), f"Ожидалась ошибка 400/404, получен: {response.status_code}"
+
+        try:
+            data = response.json()
+            assert data.get("ok") is not True, "При ошибке не должно возвращаться ok: True"
+        except Exception:
+            pass
+
+    @allure.title("Ошибка при удалении несуществующего ID")
+    def test_delete_nonexistent_courier(self, registered_courier):
+        """Удаление несуществующего курьера должно вернуть ошибку, а не ок: true."""
+        existing_id = registered_courier["data"]["id"]
+        nonexistent_id = existing_id + 99999  
+
+        response = delete_courier(nonexistent_id)
+
+        assert response.status_code != 200, f"Не должен возвращаться 200 для несуществующего ID, получен: {response.status_code}"
+        
+        data = response.json()
+        assert not data.get("ok", True), "При удалении несуществующего курьера поле 'ok' не должно быть True"
+
+    @allure.title("Проверка, что курьер действительно удалён (повторный запрос вернёт ошибку)")
+    def test_delete_courier_actually_removes(self, registered_courier):
+        """После удаления повторный запрос к этому ID должен вернуть ошибку."""
+        courier_id = registered_courier["data"]["id"]
+
+        response_delete = delete_courier(courier_id)
+        assert response_delete.status_code == 200
+        assert response_delete.json().get("ok") is True
+
+        response_again = delete_courier(courier_id)
+        assert response_again.status_code != 200
+
+        data_again = response_again.json()
+        assert not data_again.get("ok", True), "Повторное удаление несуществующего курьера не должно возвращать ok: True"

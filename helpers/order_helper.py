@@ -6,3 +6,4 @@ def create_order(payload: dict):
 
 def get_orders():
     return requests.get(f"{BASE_URL}/orders")
+
