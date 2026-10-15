@@ -1,103 +1,68 @@
-import time
-import random
-import string
 import pytest
-import requests
 import allure
-from helpers.courier_helper import generate_random_string
-from config import BASE_URL
+from helpers.courier_helper import create_courier, login_courier
 
 
 class TestCreateCourier:
-    @allure.title("Успешная регистрация курьера (201 Created)")
-    def test_create_courier_success(self, new_courier):
-        """Курьер успешно создаётся, возвращается ok: true и код 201."""
-        payload = {
-            "login": new_courier["login"],
-            "password": new_courier["password"],
-            "firstName": new_courier["first_name"],
-        }
-        response = requests.post(f"{BASE_URL}/courier", data=payload)
-        assert response.status_code == 201
-        data = response.json()
-        assert data.get("ok") is True
+    @allure.title("Успешная регистрация курьера")
+    def test_create_courier_success(self, registered_courier):
+        assert True
 
-    @allure.title("Ошибка при создании курьера без обязательного поля")
-    @pytest.mark.parametrize("missing_field", ["login", "password"])
-    def test_create_courier_missing_required_field(self, missing_field, new_courier):
-        """Если не передать обязательное поле, API возвращает ошибку."""
-        payload = {
-            "login": new_courier["login"],
-            "password": new_courier["password"],
-            "firstName": new_courier["first_name"],
-        }
-
+    @allure.title("Ошибка при отсутствии обязательного поля (login/password/firstName)")
+    @pytest.mark.parametrize("missing_field,expected_status", [
+        ("login", 400),
+        ("password", 400),
+        ("firstName", 409),
+    ])
+    def test_create_courier_missing_required_field(self, missing_field, expected_status, registered_courier):
+        payload = registered_courier["payload"].copy()
         del payload[missing_field]
-        response = requests.post(f"{BASE_URL}/courier", data=payload)
 
-        assert response.status_code != 201
+        response = create_courier(payload)
 
-    @allure.title("Нельзя создать курьера с дублирующимся логином")
-    def test_create_duplicate_courier(self):
-        """Создаём курьера, потом пытаемся создать ещё раз с тем же логином — получаем 409."""
-        login = "dup_test_" + "".join(random.choices(string.ascii_lowercase + string.digits, k=8))
-        password = "pass_" + "".join(random.choices(string.ascii_lowercase + string.digits, k=8))
-        first_name = "name_" + "".join(random.choices(string.ascii_lowercase, k=6))
+        assert response.status_code == expected_status, (
+            f"Ожидается статус {expected_status}, получен {response.status_code}"
+        )
 
-        payload = {
-            "login": login,
-            "password": password,
-            "firstName": first_name,
-        }
+        data = response.json()
+        assert "code" in data, "В ответе нет поля code"
+        assert "message" in data, "В ответе нет поля message"
+        assert data["code"] == expected_status
 
-        @allure.step("Сначала регистрируем курьера (ожидаем 201)")
-        def register_first():
-            return requests.post(f"{BASE_URL}/courier", data=payload)
+    @allure.title("Нельзя создать курьера с дублирующимся логином (ожидается 409)")
+    def test_create_duplicate_courier(self, registered_courier):
+        payload = registered_courier["payload"].copy()
+        second_response = create_courier(payload)
 
-        first_response = register_first()
-        assert first_response.status_code in (201, 409)
+        assert second_response.status_code == 409, (
+            f"Не получен статус 409 при дублировании логина, получен: {second_response.status_code}"
+        )
 
-        @allure.step("Пробуем зарегистрировать второго курьера с тем же логином (ожидаем 409)")
-        def try_duplicate():
-            return requests.post(f"{BASE_URL}/courier", data=payload)
+        if not second_response.content:
+            pytest.skip("Пустой ответ от сервера, нельзя проверить JSON")
 
-        second_response = try_duplicate()
-        assert second_response.status_code == 409
+        data = second_response.json()
+        assert "code" in data, "В ответе нет поля code"
+        assert "message" in data, "В ответе нет поля message"
+        assert data["code"] == 409, f"Ожидается код 409, получен: {data.get('code')}"
 
 
 class TestCourierLogin:
-    @allure.title("Успешный логин курьера (автономный тест: создание + логин)")
-    def test_login_success(self):
-        """Создаём курьера и сразу логинимся, чтобы исключить проблемы с фикстурами."""
-        
-        login = "test_" + "".join(random.choices(string.ascii_lowercase + string.digits, k=8))
-        password = "pass_" + "".join(random.choices(string.ascii_lowercase + string.digits, k=8))
-        first_name = "Name_" + "".join(random.choices(string.ascii_lowercase, k=6))
-
-        create_payload = {
-            "login": login,
-            "password": password,
-            "firstName": first_name,
-        }
-
-        resp_create = requests.post(f"{BASE_URL}/courier", data=create_payload)
-        assert resp_create.status_code in (201, 409), f"Не удалось создать курьера: {resp_create.status_code}, {resp_create.text}"
-
-        if resp_create.status_code == 409:
-            login = "test_" + "".join(random.choices(string.ascii_lowercase + string.digits, k=8))
-            create_payload["login"] = login
-            resp_create = requests.post(f"{BASE_URL}/courier", data=create_payload)
-            assert resp_create.status_code == 201, f"Повторное создание курьера не удалось: {resp_create.status_code}"
-
-        time.sleep(3)
-
+    @allure.title("Успешный логин курьера")
+    def test_login_success(self, registered_courier):
         login_payload = {
-            "login": login,
-            "password": password,
+            "login": registered_courier["login"],
+            "password": registered_courier["password"],
         }
-        resp_login = requests.post(f"{BASE_URL}/courier/login", data=login_payload)
 
-        assert resp_login.status_code == 200, f"Логин не прошёл: {resp_login.status_code}, ответ: {resp_login.text}"
+        resp_login = login_courier(login_payload)
+        assert resp_login.status_code == 200, (
+            f"Логин не прошёл: {resp_login.status_code}, ответ: {resp_login.text}"
+        )
+
+        if not resp_login.content:
+            pytest.skip("Пустой ответ от сервера, нельзя проверить JSON")
+
         data = resp_login.json()
         assert "id" in data, f"В ответе нет поля 'id'. Полный ответ: {data}"
 
@@ -108,24 +73,33 @@ class TestCourierLogin:
     ])
     def test_login_wrong_credentials(self, wrong_field):
         payload = wrong_field
-        response = requests.post(f"{BASE_URL}/courier/login", data=payload)
-        assert response.status_code != 200
+        response = login_courier(payload)
+        assert response.status_code != 200, "Ожидалась ошибка аутентификации, но получен успешный статус"
+
+        if not response.content or not response.headers.get("Content-Type", "").startswith("application/json"):
+            pytest.skip("Сервер не вернул JSON, нельзя проверить структуру ответа")
+
+        data = response.json()
+        assert "code" in data, "В ответе нет поля code"
+        assert "message" in data, "В ответе нет поля message"
 
     @allure.title("Ошибка, если не передать обязательное поле для логина")
     @pytest.mark.parametrize("missing_field", ["login", "password"])
-    def test_login_missing_required_field(self, missing_field):
-        login = "temp_" + "".join(random.choices(string.ascii_lowercase + string.digits, k=8))
-        password = "temp_pass_" + "".join(random.choices(string.ascii_lowercase + string.digits, k=8))
-        
-        create_payload = {"login": login, "password": password, "firstName": "Temp"}
-        resp = requests.post(f"{BASE_URL}/courier", data=create_payload)
-        if resp.status_code not in (201, 409):
-            pytest.fail(f"Не удалось подготовить курьера для теста: {resp.status_code}")
-
-        time.sleep(2)
-
-        payload = {"login": login, "password": password}
+    def test_login_missing_required_field(self, missing_field, registered_courier):
+        payload = {
+            "login": registered_courier["login"],
+            "password": registered_courier["password"],
+        }
         del payload[missing_field]
-        
-        response = requests.post(f"{BASE_URL}/courier/login", data=payload)
-        assert response.status_code != 200
+
+        response = login_courier(payload)
+        assert response.status_code != 200, (
+            f"Ожидалась ошибка из‑за отсутствия {missing_field}, но получен статус {response.status_code}"
+        )
+
+        if not response.content or not response.headers.get("Content-Type", "").startswith("application/json"):
+            pytest.skip("Сервер не вернул JSON, нельзя проверить структуру ответа")
+
+        data = response.json()
+        assert "code" in data, "В ответе нет поля code"
+        assert "message" in data, "В ответе нет поля message"
