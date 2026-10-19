@@ -1,26 +1,15 @@
 import requests
-import random
-import string
+import allure
 from config import BASE_URL
 
-def generate_random_string(length: int) -> str:
-    letters = string.ascii_lowercase
-    return ''.join(random.choice(letters) for _ in range(length))
 
-def register_new_courier_and_return_login_password():
-    login = generate_random_string(10)
-    password = generate_random_string(10)
-    first_name = generate_random_string(10)
+@allure.step("POST /courier — создание курьера")
+def create_courier(payload: dict):
+    """Отправляет POST-запрос на создание курьера."""
+    return requests.post(f"{BASE_URL}/courier", json=payload, timeout=60)
 
-    payload = {
-        "login": login,
-        "password": password,
-        "firstName": first_name,
-    }
 
-    response = requests.post(f"{BASE_URL}/courier", data=payload)
-
-    if response.status_code == 201:
-        return [login, password, first_name]
-    return []
-
+@allure.step("POST /courier/login — логин курьера")
+def login_courier(payload: dict):
+    """Отправляет POST-запрос на логин курьера."""
+    return requests.post(f"{BASE_URL}/courier/login", json=payload, timeout=60)
