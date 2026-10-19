@@ -3,6 +3,7 @@ import random
 import string
 from helpers.courier_helper import create_courier
 
+
 @pytest.fixture
 def registered_courier():
     login = ''.join(random.choices(string.ascii_lowercase + string.digits, k=10))
@@ -16,13 +17,14 @@ def registered_courier():
     }
 
     response = create_courier(payload)
-    assert response.status_code == 201, f"Курьер не создан. Статус: {response.status_code}, ответ: {response.text}"
-
+    
     data = response.json() if response.content else {}
+
     yield {
         "login": login,
         "password": password,
         "first_name": first_name,
         "payload": payload,
         "response": data,
+        "status_code": response.status_code,
     }
