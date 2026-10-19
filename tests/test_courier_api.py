@@ -1,12 +1,27 @@
 import pytest
 import allure
+import uuid
 from helpers.courier_helper import create_courier, login_courier
 
 
 class TestCreateCourier:
     @allure.title("Успешная регистрация курьера")
-    def test_create_courier_success(self, registered_courier):
-        assert True
+    def test_create_courier_success(self):
+        unique_login = f"courier_{uuid.uuid4().hex[:8]}"
+        payload = {
+            "login": unique_login,
+            "password": "secret123",
+            "firstName": "TestName",
+        }
+
+        response = create_courier(payload)
+
+        assert response.status_code == 201, (
+            f"Ожидается статус 201, получен {response.status_code}. Ответ: {response.text}"
+        )
+
+        data = response.json()
+        assert data.get("ok") is True, f"Ожидается ok: True, получен: {data}"
 
     @allure.title("Ошибка при отсутствии обязательного поля (login/password/firstName)")
     @pytest.mark.parametrize("missing_field,expected_status", [
@@ -38,13 +53,10 @@ class TestCreateCourier:
             f"Не получен статус 409 при дублировании логина, получен: {second_response.status_code}"
         )
 
-        if not second_response.content:
-            pytest.skip("Пустой ответ от сервера, нельзя проверить JSON")
-
         data = second_response.json()
         assert "code" in data, "В ответе нет поля code"
         assert "message" in data, "В ответе нет поля message"
-        assert data["code"] == 409, f"Ожидается код 409, получен: {data.get('code')}"
+        assert data["code"] == 409
 
 
 class TestCourierLogin:
@@ -60,30 +72,26 @@ class TestCourierLogin:
             f"Логин не прошёл: {resp_login.status_code}, ответ: {resp_login.text}"
         )
 
-        if not resp_login.content:
-            pytest.skip("Пустой ответ от сервера, нельзя проверить JSON")
-
         data = resp_login.json()
         assert "id" in data, f"В ответе нет поля 'id'. Полный ответ: {data}"
 
-    @allure.title("Ошибка при неверном логине или пароле")
-    @pytest.mark.parametrize("wrong_field", [
-        {"login": "wrong_login", "password": "any_password"},
-        {"login": "any_login", "password": "wrong_password"},
+    @allure.title("Ошибка аутентификации при неверных данных (ожидается 404)")
+    @pytest.mark.parametrize("payload,expected_status", [
+        ({"login": "wrong", "password": "correct"}, 404),
+        ({"login": "correct", "password": "wrong"}, 404),
     ])
-    def test_login_wrong_credentials(self, wrong_field):
-        payload = wrong_field
+    def test_login_wrong_credentials(self, payload, expected_status):
         response = login_courier(payload)
-        assert response.status_code != 200, "Ожидалась ошибка аутентификации, но получен успешный статус"
-
-        if not response.content or not response.headers.get("Content-Type", "").startswith("application/json"):
-            pytest.skip("Сервер не вернул JSON, нельзя проверить структуру ответа")
+        assert response.status_code == expected_status, (
+            f"Ожидался статус {expected_status}, получен {response.status_code}"
+        )
 
         data = response.json()
         assert "code" in data, "В ответе нет поля code"
         assert "message" in data, "В ответе нет поля message"
+        assert data["code"] == expected_status
 
-    @allure.title("Ошибка, если не передать обязательное поле для логина")
+    @allure.title("Ошибка, если не передать обязательное поле для логина (ожидается 400)")
     @pytest.mark.parametrize("missing_field", ["login", "password"])
     def test_login_missing_required_field(self, missing_field, registered_courier):
         payload = {
@@ -93,13 +101,14 @@ class TestCourierLogin:
         del payload[missing_field]
 
         response = login_courier(payload)
-        assert response.status_code != 200, (
-            f"Ожидалась ошибка из‑за отсутствия {missing_field}, но получен статус {response.status_code}"
-        )
+        expected_status = 400
 
-        if not response.content or not response.headers.get("Content-Type", "").startswith("application/json"):
-            pytest.skip("Сервер не вернул JSON, нельзя проверить структуру ответа")
+        assert response.status_code == expected_status, (
+            f"Ожидался статус {expected_status} при отсутствии {missing_field}, "
+            f"получен {response.status_code}"
+        )
 
         data = response.json()
         assert "code" in data, "В ответе нет поля code"
         assert "message" in data, "В ответе нет поля message"
+        assert data["code"] == expected_status
